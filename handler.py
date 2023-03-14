@@ -1,23 +1,63 @@
 from info import info
-import networkx as nx
+import networkx
+
+# Examples are here:
+# https://github.com/PACE-challenge/Treewidth-PACE-2017-instances/blob/master/gr/exact/ex001.gr.xz
 
 def compute_tree_decomposition(graph):
-  """
-  Computes the tree decomposition of a given graph.
-  Returns a list of bags for each node in the tree.
-  """
+  # Compute the tree decomposition using the treewidth_min_degree algorithm
+  _, tree_decomposition = networkx.algorithms.approximation.treewidth_min_degree(graph)
+  info(tree_decomposition)
 
-  # http://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.approximation.treewidth.treewidth_min_degree.html
-  _, td = nx.algorithms.approximation.treewidth_min_degree(graph)
-  bags = [td[node] for node in td]
-  return bags
+  # Compute the bags for each node in the tree decomposition
+  bags = tree_decomposition.nodes()
+  info(bags)
+
+  bag_numbers = {}
+  for i, bag in enumerate(bags):
+    bag_numbers[bag] = i + 1
+
+  # Compute the maximum bag size
+  max_bag_size = max(len(bag) for bag in bags)
+  info(max_bag_size)
+
+  # Output the tree decomposition in the specified format
+  output = f"c This file describes a tree decomposition with {len(bags)} bags, width {max_bag_size - 1}, for a graph with {len(graph)} vertices\n"
+  output += f"s td {len(bags)} {max_bag_size} {len(graph)}\n"
+
+  for bag in tree_decomposition:
+    bag_str = " ".join(str(vertex) for vertex in bag)
+    bag_number = bag_numbers[bag]
+    output += f"b {bag_number} {bag_str}\n"
+
+  for bag in tree_decomposition:
+    bag_number = bag_numbers[bag]
+    for neighbor in tree_decomposition.neighbors(bag):
+      neighbor_number = bag_numbers[neighbor]
+      if neighbor_number > bag_number:
+        output += f"{bag_number} {neighbor_number}\n"
+
+  return output
 
 def handle(pb2_request, repo_path):
-  # https://pacechallenge.wordpress.com/pace-2016/track-a-treewidth/
-  graph = nx.Graph()
-  graph.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 5)])
+  gr_format = pb2_request.input.decode('utf-8')
+  info(gr_format)
 
-  bags = compute_tree_decomposition(graph)
+  graph = networkx.Graph()
+  lines = gr_format.split('\n')
+  for line in lines:
+    if line.startswith('c'):
+      continue
+    elif line.startswith('p'):
+      p, tw, n_nodes, _ = line.split()
+      assert p == 'p' and tw == 'tw'
+      n_nodes = int(n_nodes)
+      graph.add_nodes_from(range(1, n_nodes+1))
+    elif line:
+      u, v = map(int, line.split())
+      graph.add_edge(u, v)
 
-  for i, bag in enumerate(bags):
-    print(f"Node {i}: {bag}")
+  tree_decomp_str = compute_tree_decomposition(graph)
+
+  print(tree_decomp_str)
+  return tree_decomp_str
